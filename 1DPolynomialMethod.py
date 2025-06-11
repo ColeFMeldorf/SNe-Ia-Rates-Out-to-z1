@@ -14,6 +14,7 @@ MAX_Z = 0.6
 MIN_Z = 0.2
 max_i = 24.5
 
+sfr_sep = 0.5  #Log SFR separation for high and low SFR hostgals
 LaurenNicePlots()
 
 # Load real data
@@ -21,7 +22,9 @@ LaurenNicePlots()
 hostgals = fits.open(r"C:\Users\cmeldorf\Downloads\DES-SN5YR_DES_HEAD.FITS\DES-SN5YR_DES_HEAD.FITS")[1].data
 cosmo_sne = pd.read_csv(r"C:\Users\cmeldorf\Downloads\DES-SN5YR_HD+MetaData.csv")[:1635]
 
+
 hostlib = pd.read_table(r"C:\Users\cmeldorf\Downloads\DES-SN5YR_DES.HOSTLIB\DES-SN5YR_DES.HOSTLIB", comment = '#', skiprows = 57, sep = '\s+')
+
 #hostlib = pd.read_table(r"C:\Users\cmeldorf\Downloads\corrected_deduped_with_magauto_logsfr_upto_4.HOSTLIB+HOSTNBR\corrected_deduped_with_magauto_logsfr_upto_4.HOSTLIB+HOSTNBR", skiprows = 2, comment = '#', sep = '\s+')
 
 
@@ -53,32 +56,7 @@ print(np.shape(hostlib), 'hostlib shape')
 real_array = np.array([cosmo_sne['zHD'], hostgals['HOSTGAL_MAG_r'], cosmo_sne['c'], cosmo_fields, cosmo_sne['x1']]).T
 real_array = real_array[(cosmo_sne['zHD'] < MAX_Z) & (cosmo_sne['zHD'] > MIN_Z)]
 
-plt.subplot(2,3,1)
-loghist, _, _ =plt.hist(hostlib['LOGMASS'], bins = np.linspace(7, 12, 50), histtype = 'step', label = 'Hostlib Masses', color = 'C0', density = True)
-print('Hostlib Masses', np.shape(hostlib['LOGMASS']))
-plt.yscale('log')
 
-x = [7.047789818077926, 7.2102748136431805, 7.353644267876959, 7.444444260682686, 7.568697897942348, 7.731182617864964, 7.912783706046972, 8.156511337216173, 8.357228242372296, 8.562724239593267, 8.744324776489998, 8.94026314086655, 9.169653495841207, 9.422939311140103, 9.657108758179609, 9.881720572374695, 10.163679837492126, 10.46953401164852, 10.75149327676595, 10.937873457012806, 11.066905635052041, 11.200716905156122, 11.339307267325053, 11.420549627286361]
-y = [1132.540765804203, 2143.292994929668, 3018.074830946204, 4965.307582469544, 6270.435393930947, 10808.95843950722, 16197.933716284108, 19828.839972178033, 21102.029679612348, 21102.029679612348, 18061.62933265445, 14526.544191823114, 12241.57508354335, 9693.640935300697, 7918.600975101953, 6468.607034015782, 5366.975513727014, 4665.721857553848, 3471.6886712951996, 2045.5531516076105, 1031.6050532848835, 405.60982495523245, 149.8566984255766, 44.529645577932406]
-
-w_bin_width = np.mean(np.diff(x))
-
-area = np.sum(np.array(y) * w_bin_width)
-
-plt.scatter(x, np.array(y)/area,  color = 'C1', s = 1, label = 'Wiseman et. al. Hostlib Masses')
-
-
-
-plt.legend()
-plt.xlim(8,12)
-
-plt.subplot(2,3,4)
-from scipy import interpolate
-f = interpolate.interp1d(x, y/area, kind='linear', fill_value='extrapolate')
-bins = np.linspace(7, 12, 50)
-bin_centers = (bins[:-1] + bins[1:]) / 2
-plt.plot(bin_centers, loghist - f(bin_centers), label = 'This Work - Wiseman', color = 'C2')
-plt.axhline(0, color = 'C1', linestyle = '--', label = '1')
 
 plt.subplot(2,3,2)
 bins = np.arange(8, 12, 0.25)
@@ -86,13 +64,26 @@ bins = np.arange(8, 12, 0.25)
 
 a,b = np.histogram(hostgals['HOSTGAL_LOGMASS'], density = True, bins = bins)
 b_centers = (b[:-1] + b[1:]) / 2
-plt.plot(b_centers, a, label = 'Hostgal Masses', color = 'C0')
+plt.plot(b_centers, a, label = 'Hostgal Masses')
 
 x = [8.127837336112362, 8.371564967281563, 8.643966599554576, 8.902030955633045, 9.145758586802245, 9.379928585127026, 9.633213849140645, 9.876941480309846, 10.130227295608742, 10.397849284531631, 10.632019282856412, 10.85185200498665, 11.13859036216893, 11.367980717143586, 11.630825267857457]
 y = [-0.0016259631403337978, 0.0520325086337578, 0.0650406826850605, 0.10894309425996965, 0.20975609146109098, 0.2520325398956665, 0.31707322258072684, 0.37398380820693883, 0.4422763233869402, 0.5593496084914847, 0.5691057155835301, 0.6357723614089242, 0.31544716565466663, 0.09430895706833332, 0.011382117125242404]
 print(np.size(y))
-plt.plot(x,y,  color = 'C2', label = 'Wiseman et. al.', marker = 'o')
+plt.plot(x,y, label = 'Wiseman et. al.', marker = 'o', color = 'r')
+
+
+##### diff SFR section ####
+
+high_sfr_hostgals = hostgals[hostgals['HOSTGAL_LOGSFR'] >= sfr_sep]
+low_sfr_hostgals = hostgals[hostgals['HOSTGAL_LOGSFR'] < sfr_sep]
+high_sfr_a, high_sfr_b = np.histogram(high_sfr_hostgals['HOSTGAL_LOGMASS'], density = True, bins = bins)
+low_sfr_a, low_sfr_b = np.histogram(low_sfr_hostgals['HOSTGAL_LOGMASS'], density = True, bins = bins)
+plt.plot(high_sfr_b[:-1] + (high_sfr_b[1:] - high_sfr_b[:-1]) / 2, high_sfr_a, label = 'High SFR Hostgal Masses')
+plt.plot(low_sfr_b[:-1] + (low_sfr_b[1:] - low_sfr_b[:-1]) / 2, low_sfr_a, label = 'Low SFR Hostgal Masses')
+########### 
 plt.legend()
+
+
 
 plt.subplot(2,3,5)
 plt.plot(b_centers, a - y, label = 'This Work - Wiseman', color = 'C0')
@@ -196,13 +187,74 @@ Vmax, Vmaxbins, Vmax_correction, counts = calc_Vmax(max_z = MAX_Z, max_i = max_i
                                              min_z = MIN_Z)
 #Vmax_correction[Vmax_correction > 1e4] = 1e4  #Cutting out extreme outliers
 
+
+
+plt.subplot(2,3,1)
+plt.xlim(8, 12)
+#loghist, _, _ =plt.hist(Vmax, bins = bins, histtype = 'step', label = 'Hostlib Masses', color = 'C0', density = True)
+#print(Vmax[:10], 'Vmax first 10 values')
+bin_centers = (bins[:-1] + bins[1:]) / 2
+bin_width = np.mean(np.diff(bin_centers))
+Vmax_area = np.sum(np.array(Vmax) * bin_width)
+plt.plot(bin_centers, Vmax/Vmax_area, label = 'Vmax', marker = 'o', ms = 1)
+plt.yscale('log')
+
+#### diff SFR section####
+low_sfr_hostlib = hostlib[hostlib['LOGSFR'] < sfr_sep]
+high_sfr_hostlib = hostlib[hostlib['LOGSFR'] >= sfr_sep]
+
+low_sfr_Vmax, low_sfr_bins, low_sfr_Vmax_correction, low_sfr_counts = calc_Vmax(max_z = MAX_Z, max_i = max_i,
+                                            measured_z = low_sfr_hostlib['ZTRUE'],
+                                             measured_i = low_sfr_hostlib['i_obs_auto'], 
+                                             mass = low_sfr_hostlib['LOGMASS'], 
+                                             bins = bins,
+                                             min_z = MIN_Z)
+
+high_sfr_Vmax, high_sfr_bins, high_sfr_Vmax_correction, high_sfr_counts = calc_Vmax(max_z = MAX_Z, max_i = max_i,
+                                            measured_z = high_sfr_hostlib['ZTRUE'],
+                                             measured_i = high_sfr_hostlib['i_obs_auto'], 
+                                             mass = high_sfr_hostlib['LOGMASS'], 
+                                             bins = bins,
+                                             min_z = MIN_Z) 
+
+low_sfr_Vmax_area = np.sum(np.array(low_sfr_Vmax) * bin_width)
+high_sfr_Vmax_area = np.sum(np.array(high_sfr_Vmax) * bin_width)
+
+plt.plot(bin_centers, low_sfr_Vmax/low_sfr_Vmax_area, label = 'Low SFR Vmax', marker = 'o', ms = 1)
+plt.plot(bin_centers, high_sfr_Vmax/high_sfr_Vmax_area, label = 'High SFR Vmax', marker = 'o', ms = 1)
+
+####################################
+plt.legend()
+
+
+x = [7.047789818077926, 7.2102748136431805, 7.353644267876959, 7.444444260682686, 7.568697897942348, 7.731182617864964, 7.912783706046972, 8.156511337216173, 8.357228242372296, 8.562724239593267, 8.744324776489998, 8.94026314086655, 9.169653495841207, 9.422939311140103, 9.657108758179609, 9.881720572374695, 10.163679837492126, 10.46953401164852, 10.75149327676595, 10.937873457012806, 11.066905635052041, 11.200716905156122, 11.339307267325053, 11.420549627286361]
+y = [1132.540765804203, 2143.292994929668, 3018.074830946204, 4965.307582469544, 6270.435393930947, 10808.95843950722, 16197.933716284108, 19828.839972178033, 21102.029679612348, 21102.029679612348, 18061.62933265445, 14526.544191823114, 12241.57508354335, 9693.640935300697, 7918.600975101953, 6468.607034015782, 5366.975513727014, 4665.721857553848, 3471.6886712951996, 2045.5531516076105, 1031.6050532848835, 405.60982495523245, 149.8566984255766, 44.529645577932406]
+
+w_bin_width = np.mean(np.diff(x))
+
+area = np.sum(np.array(y) * w_bin_width)
+
+plt.plot(x, np.array(y)/area,  color = 'r', label = 'Wiseman et. al. Hostlib Masses')
+
+plt.subplot(2,3,4)
+from scipy import interpolate
+f = interpolate.interp1d(x, y/area, kind='linear', fill_value='extrapolate')
+
+plt.plot(bin_centers, (Vmax/Vmax_area) - f(bin_centers), label = 'This Work - Wiseman', color = 'C2')
+plt.axhline(0, color = 'C1', linestyle = '--', label = '1')
+ratio1 = (Vmax/Vmax_area) / f(bin_centers)
+
+plt.subplot(2,3,6)
+
+
+
 N_SN_no_corr = np.histogram(cosmo_sne['HOST_LOGMASS'], bins = bins)
 bin_centers = (bins[:-1] + bins[1:]) / 2
 
 plt.subplot(2,3,3)
 N_SN = scipy.stats.binned_statistic(cosmo_sne['HOST_LOGMASS'], correction * volume_factor,  bins = bins, statistic = 'sum')[0] 
 
-plt.plot(bin_centers[1:], ((N_SN / Vmax) * 1/total_time)[1:], label = 'Inferred SNe', color = 'C1')
+plt.plot(bin_centers[1:], ((N_SN / Vmax) * 1/total_time)[1:], label = 'Inferred SNe')
 
 
 plt.yscale('log')
@@ -213,5 +265,13 @@ y = np.array(y)
 y = 10**y
 
 plt.plot(x, y, label = 'Wiseman et. al.', marker = 'o', ms = 1, color = 'r')
+
+### diff SFR section ####
+high_sfr_N_SN = scipy.stats.binned_statistic(high_sfr_hostgals['HOSTGAL_LOGMASS'], (correction * volume_factor)[hostgals['HOSTGAL_LOGSFR'] >= sfr_sep],  bins = bins, statistic = 'sum')[0]
+low_sfr_N_SN = scipy.stats.binned_statistic(low_sfr_hostgals['HOSTGAL_LOGMASS'], (correction * volume_factor)[hostgals['HOSTGAL_LOGSFR'] < sfr_sep],  bins = bins, statistic = 'sum')[0]
+
+plt.plot(bin_centers[1:], ((high_sfr_N_SN / high_sfr_Vmax) * 1/total_time)[1:], label = 'High SFR Inferred SNe')
+plt.plot(bin_centers[1:], ((low_sfr_N_SN / low_sfr_Vmax) * 1/total_time)[1:], label = 'Low SFR Inferred SNe')
+
 plt.legend()
 plt.show()

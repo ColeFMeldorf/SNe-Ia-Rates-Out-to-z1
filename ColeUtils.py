@@ -53,12 +53,12 @@ def calculate_volume(minz, maxz, area):
     V = survey_volume / 41252.96125
     return V
 
-def calc_Vmax(max_z, max_i, measured_z, measured_i, mass, bins, min_z = 0):
+def calc_Vmax(max_z, max_i, measured_z, measured_i, statistic, bins, min_z = 0):
     cosmo = FlatLambdaCDM(H0=70 * u.km / u.s / u.Mpc, Tcmb0=2.725 * u.K, Om0=0.3)
     cut = (measured_i < max_i) & (measured_z < max_z) & (measured_z > min_z) 
     measured_z = measured_z[cut]
     measured_i = measured_i[cut]
-    mass = mass[cut]
+    statistic = statistic[cut]
     print('Z cutoff', max_z)
     print('Largest z in measured_z', np.max(measured_z))
     measured_z = np.asarray(measured_z)
@@ -66,26 +66,20 @@ def calc_Vmax(max_z, max_i, measured_z, measured_i, mass, bins, min_z = 0):
     rsurv_gal = cosmo.luminosity_distance(max_z).value
     print('Luminosity distance at max z', rsurv_gal)
     robs = cosmo.luminosity_distance(measured_z).value
-    print('Luminosity distance at measured z', robs[:10])
-    print('measured_i', measured_i[:10])
     mobs = measured_i
     msurv = max_i
     distance_modulus = 10 ** ((msurv - mobs)/5) 
     rmax = robs * distance_modulus
-    print('rmax', rmax[:10])
-    print(robs/rmax)
     Vmax_correction = np.empty_like(rmax)
+    print('size of Vmax_correction', np.size(Vmax_correction))
     Vmax_correction = (rsurv_gal / rmax)**3
     Vmax_correction[Vmax_correction < 1] = 1
-    print('inf redshifts:')
-    print(measured_z[np.where(Vmax_correction == np.inf)])
-    print('and robs')
-    print(robs[np.where(Vmax_correction == np.inf)])
+
     print('>1 fraction', np.size(Vmax_correction[np.where(Vmax_correction > 1)]) / np.size(Vmax_correction))
     print('max and min', np.max(Vmax_correction), np.min(Vmax_correction))
 
-    Vmax_binned, bin_edges = scipy.stats.binned_statistic(mass, Vmax_correction, bins=bins, statistic='sum')[:2]
-    counts, bin_edges = scipy.stats.binned_statistic(mass, Vmax_correction, bins=bins, statistic='count')[:2]
+    Vmax_binned, bin_edges = scipy.stats.binned_statistic(statistic, Vmax_correction, bins=bins, statistic='sum')[:2]
+    counts, bin_edges = scipy.stats.binned_statistic(statistic, Vmax_correction, bins=bins, statistic='count')[:2]
     print('mean vmax correction', np.mean(Vmax_correction))
     print(Vmax_binned/counts)
 
@@ -131,3 +125,42 @@ def LaurenNicePlots():
     # cycle_markers = ['o','^','*']
     #+ mpl.cycler(marker=cycle_markers)
     update_rcParams('axes.prop_cycle', mpl.cycler(color=cycle_colors) )
+
+   
+def VVmax(redshifts, observed_mag_r, abs_r_mag, zmin_survey=0,zmax_survey=1,method='ZPEG'):
+    from astropy.cosmology import WMAP9 as cosmo
+    if zmin_survey>0:
+        vmin = cosmo.comoving_volume(zmin_survey)
+    else:
+        vmin = 0*(u.mpc**3)
+    Vsurvey = cosmo.comoving_volume(zmax_survey) - vmin
+
+    redshift = pd.Series(redshifts)
+    distmod_z = cosmo.distmod(redshift.values)
+    distmod_mag = observed_mag_r - abs_r_mag,
+    kcorr = distmod_z.value - distmod_mag
+    kcorr = kcorr[0]
+    kcorr_z = kcorr/redshift
+    from astropy.cosmology import z_at_value
+    abs_r_mag = pd.Series(abs_r_mag)
+
+    lim_mag = 24.5
+    print(f'USING LIMITING MAGNITUDE OF {lim_mag}')
+    distmod_max = lim_mag - abs_r_mag + kcorr
+    distmod_max = distmod_max.apply(lambda x:x*u.mag)
+
+    print(distmod_max.min(), distmod_max.max())
+
+    zmin = z_at_value(cosmo.distmod, distmod_max.min())
+    zmax = z_at_value(cosmo.distmod, distmod_max.max())
+
+    zgrid = np.logspace(np.log10(zmin.value), np.log10(zmax.value), 50)
+    Dgrid = cosmo.distmod(zgrid)
+    zvals = np.interp(distmod_max.apply(lambda x: x.value), Dgrid.value, zgrid)
+
+    vmax = cosmo.comoving_volume(zvals)
+
+    VVmax = Vsurvey/vmax
+
+    VVmax[VVmax < 1] = 1  # Ensure Vmax correction is at least 1
+    return VVmax
